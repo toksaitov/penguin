@@ -23,10 +23,10 @@ def confirm_disk_destructive_operations():
     Otherwise exits with code 1.
 
     """
-    confirmation = raw_input('''This script will try to repartition the disk
-                                specified in the configuration.\nConfirm that
-                                this is what you want by typing "Continue"
-                                and pressing Enter: ''')
+    confirmation = raw_input('This script will try to repartition the disk '  \
+                             'specified in the configuration.\nConfirm that ' \
+                             'this is what you want by typing "Continue" '    \
+                             'and pressing Enter: ')
 
     if confirmation.strip() != 'Continue':
         sys.exit(1)
@@ -44,8 +44,15 @@ def sh(command, message=None):
     if message:
         print message
     try:
-        output = subprocess.check_output(command, shell=True)
-        if verbose_output: print output
-    except Exception as error:
-        sys.exit('%s\n%s' % (error.output, error))
+        if verbose_output:
+            subprocess.check_call(command, stdout=sys.stdout,
+                                           stderr=sys.stderr,
+                                           shell=True)
+        else:
+            subprocess.check_output(command, shell=True)
+    except subprocess.CalledProcessError as error:
+        if hasattr(error, 'output'):
+            sys.exit('%s\n%s' % (error.output, error))
+        else:
+            sys.exit(error)
 
