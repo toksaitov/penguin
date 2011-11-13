@@ -3,19 +3,38 @@
 # Toksaitov Dmitrii Alexandrovich
 # Tue Nov 8 06:23:02 KGT 2011
 
+import sys, os
 import utils
 
-def perform(options):
-    """Executes all steps to build a system.
+forced_mode = False
+
+def perform(configuration):
+    """Executes all steps to build a system defined in the configuration.
 
     Partitions the disk, compiles the toolchain, etc.
 
     """
-    utils.verbose_output = options['verbose_output']
-    partition_disk(options['configuration'])
+    partition_disk(configuration)
+
+def confirm_disk_destructive_operations():
+    """Asks the user to confirm destructive disk operations.
+
+    Otherwise exits with code 1.
+
+    If the forced mode is on, no questions are asked.
+
+    """
+    if not forced_mode:
+        confirmation = raw_input('This script will try to repartition the ' \
+                                 'disk specified in the configuration.\n'   \
+                                 'Confirm that this is what you want by '   \
+                                 'typing "Continue" and pressing Enter: ')
+
+        if confirmation.strip() != 'Continue':
+            utils.exit(1)
 
 def partition_disk(configuration):
-    """Tries to partition the disk as specified in the configuration file.
+    """Tries to partition the disk as specified in the configuration.
 
     Samples of required fields in a JSON configuration:
 
@@ -62,10 +81,10 @@ def partition_disk(configuration):
 
     """
     utils.stop_if_not_root()
-    utils.confirm_disk_destructive_operations()
+    confirm_disk_destructive_operations()
 
     device = configuration['device']['path']
-    print 'Trying to partition the disk "%s".' % device
+    utils.message('Trying to partition the disk "%s".' % device)
 
     utils.sh('type parted', 'Checking if GNU parted is installed.')
     utils.sh("parted --script '%s' mklabel gpt" % device,
