@@ -1,0 +1,27 @@
+{
+  "full name": "HZ Lunux",
+  "short name": "hzl",
+
+  "device": {
+    "path": "/dev/sdb"
+  },
+
+  "partitions": [
+    {
+      "type": "ESP",
+      "size": 200
+    },
+    {
+      "type": "BIOS Boot",
+      "size": 1
+    }, {
+      "type": "Swap",
+      "size": 1024
+    },
+    {
+      "type": "Root",
+      "file system": "BTRFS"
+    }
+  ]
+}
+
