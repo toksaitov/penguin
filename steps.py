@@ -90,7 +90,7 @@ def partition_disk(configuration):
     utils.sh("parted --script '%s' mklabel gpt" % device,
              'Creating the GPT partition scheme on "%s".' % device)
 
-    device_position = 0
+    device_position = 2
 
     short_name = configuration['short name']
     partitions = configuration['partitions']
