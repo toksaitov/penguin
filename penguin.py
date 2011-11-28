@@ -1,6 +1,6 @@
 """Builds custom Linux systems.
 
-Written while on the road of reading "Linux From Scratch".
+Written while on the road of reading Linux From Scratch.
 
 """
 
@@ -54,7 +54,7 @@ def process_command_line_arguments():
 
     utils.verbose_output = options['verbose']
     utils.quiet_mode     = options['quiet']
-    steps.forced_mode    = options['force']
+    utils.forced_mode    = options['force']
 
     return options
 

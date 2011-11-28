@@ -20,8 +20,10 @@
     },
     {
       "type": "Root",
-      "file system": "BTRFS"
+      "file system": "Ext4"
     }
-  ]
+  ],
+
+  "build user": "hzl"
 }
 
