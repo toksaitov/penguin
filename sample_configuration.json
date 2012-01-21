@@ -24,6 +24,58 @@
     }
   ],
 
-  "build user": "hzl"
+  "build user": "hzl",
+
+  "first build pass": {
+    "packages directory": "/home/hzl/src/",
+    "installation directory": "toolchain/",
+    "packages": [
+      {
+        "name":   "GNU Binutils",
+        "source": "http://ftp.gnu.org/gnu/binutils/binutils-2.22.tar.bz2",
+        "config flags":  "--disable-nls --disable-werror"
+      },
+      {
+        "name": "GNU GCC",
+        "source": "http://ftp.gnu.org/gnu/gcc/gcc-4.6.2/gcc-4.6.2.tar.bz2",
+        "required packages": [
+          {
+            "name":   "The GNU MPFR Library",
+            "source": "http://ftp.gnu.org/gnu/mpfr/mpfr-3.1.0.tar.xz",
+            "directory name": "mpfr"
+          },
+          {
+            "name":   "The GNU Multiple Precision Arithmetic Library",
+            "source": "http://ftp.gnu.org/gnu/gmp/gmp-5.0.2.tar.bz2",
+            "directory name": "gmp"
+          },
+          {
+            "name":   "The MPC Library",
+            "source": "http://www.multiprecision.org/mpc/download/mpc-0.9.tar.gz",
+            "directory name": "mpc"
+          }
+        ],
+        "config attributes": ["--disable-nls",         "--disable-shared",
+                              "--disable-multilib",    "--disable-decimal-float",
+                              "--disable-threads",     "--disable-libmudflap",
+                              "--disable-libssp",      "--disable-libgomp",
+                              "--disable-libquadmath", "--disable-target-libiberty",
+                              "--disable-target-zlib", "--enable-languages=c",
+                              "--without-ppl",         "--without-cloog"]
+      },
+      {
+        "name": "The Linux Kernel",
+        "source": "http://www.kernel.org/pub/linux/kernel/v3.0/linux-3.1.4.tar.bz2"
+      },
+      {
+        "name":   "GNU C Library",
+        "source": "http://ftp.gnu.org/gnu/glibc/glibc-2.14.1.tar.xz",
+        "config attributes": ["--disable-profile", "--enable-add-ons",
+                              "--enable-kernel=2.6.25",
+                              "libc_cv_forced_unwind=yes",
+                              "libc_cv_c_cleanup=yes"]
+      }
+    ]
+  }
 }
 

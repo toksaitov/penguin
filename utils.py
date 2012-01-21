@@ -5,7 +5,7 @@
 
 from __future__ import print_function
 
-import subprocess, sys, os
+import sys, os, subprocess, threading
 
 verbose_output = False
 forced_mode    = False
@@ -64,7 +64,7 @@ def error_message(message):
     if not quiet_mode:
         print(message, file=sys.stderr)
 
-def sh(command, explanation=None):
+def sh(command, explanation=None, async=False):
     """Prints the 'explanation', if provided, and executes the 'command'.
 
     If the 'command' was unsuccessful, prints its output and the error message
@@ -73,25 +73,31 @@ def sh(command, explanation=None):
     If the 'command' was successful and the verbose mode was turned on, prints
     the 'command' output.
 
+    If 'async' is true, the execution of the command will not block the main
+    thread.
+
     """
-    if explanation:
-        message(explanation)
-    try:
-        if verbose_output:
-            if quiet_mode:
-                stdout = stderr = open(os.devnull, 'w')
+    if async:
+        threading.Thread(target=sh, args=[command, explanation]).start()
+    else:
+        if explanation:
+            message(explanation)
+        try:
+            if verbose_output:
+                if quiet_mode:
+                    stdout = stderr = open(os.devnull, 'w')
+                else:
+                    stdout, stderr = sys.stdout, sys.stderr
+                subprocess.check_call(command, stdout=stdout,
+                                            stderr=stderr,
+                                            shell=True)
             else:
-                stdout, stderr = sys.stdout, sys.stderr
-            subprocess.check_call(command, stdout=stdout,
-                                           stderr=stderr,
-                                           shell=True)
-        else:
-            subprocess.check_output(command, shell=True)
-    except subprocess.CalledProcessError as error:
-        if hasattr(error, 'output'):
-            exit('%s\n%s' % (error.output, error))
-        else:
-            exit(error)
+                subprocess.check_output(command, shell=True)
+        except subprocess.CalledProcessError as error:
+            if hasattr(error, 'output'):
+                exit('%s\n%s' % (error.output, error))
+            else:
+                exit(error)
 
 def get_or_create_user(user):
     """Gets the UID/GID of the 'user' or creates a new 'user' if it does not exist.
@@ -101,7 +107,7 @@ def get_or_create_user(user):
     """
     uid, gid = get_user_uid_and_gid(user)
     if not uid:
-        sh("useradd -M -U '%s'" % user, 'Creating the build user ' \
+        sh("useradd -m -U '%s'" % user, 'Creating the build user ' \
            '"%s" and its group.' % user)
 
     uid, gid = get_user_uid_and_gid(user)

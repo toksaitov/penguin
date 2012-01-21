@@ -3,45 +3,17 @@
 # Toksaitov Dmitrii Alexandrovich
 # Tue Nov 8 06:23:02 KGT 2011
 
-import sys, os, multiprocessing
+import os, multiprocessing, xmlrpclib, time
 import utils
+
+class DownloadError(Exception):
+    """Exception raised when a download manager failed to get a file."""
+    pass
 
 def perform(configuration):
     """Executes all steps to build a system defined in the 'configuration'.
 
     Partitions the disk, compiles the toolchain, etc.
-
-    Sample of the JSON configuration with the list of all required fields:
-
-        {
-          "full name": "HZ Lunux",
-          "short name": "hzl",
-
-          "device": {
-            "path": "/dev/sdb"
-          },
-
-          "partitions": [
-            {
-              "type": "ESP",
-              "size": 200
-            },
-            {
-              "type": "BIOS Boot",
-              "size": 1
-            },
-            {
-              "type": "Swap",
-              "size": 1024
-            },
-            {
-              "type": "Root",
-              "file system": "BTRFS"
-            }
-          ],
-
-          "build user": "hzl"
-        }
 
     """
     device = configuration['device']['path']
@@ -60,7 +32,10 @@ def perform(configuration):
         change_mount_point_owner(partition_mount_point, build_user)
         switch_to_user(build_user)
 
-    adjust_process_environment()
+    adjust_process_environment(partition_mount_point)
+
+    first_build_pass_settings = configuration['first build pass']
+    build_toolchain(first_build_pass_settings)
 
 def partition_disk(device, partitions):
     """Tries to partition the 'device' as specified in the list 'partitions'.
@@ -258,12 +233,17 @@ def switch_to_user(user):
     os.setregid(gid, gid)
     os.setreuid(uid, uid)
 
-def adjust_process_environment():
+def adjust_process_environment(partition_mount_point):
     """Tweaks the process environment for efficient work of its children.
 
-    Sets the default user mask, locale, and additional flags for 'make'.
+    Sets the current working directory, default user mask, locale, and
+    additional flags for 'make'.
 
     """
+    utils.message('Setting the current working directory to the mount point ' \
+                  'of the new root partition "%s".' % partition_mount_point)
+    os.chdir(partition_mount_point)
+
     utils.message('Setting the user mask to 022.')
     os.umask(0o022)
 
@@ -276,4 +256,63 @@ def adjust_process_environment():
                       'Setting the number of jobs the make utility can run ' \
                       'simultaneously to %d.' % cpu_count)
         os.environ['MAKEFLAGS'] = '-j %d' % cpu_count
+
+def build_toolchain(settings):
+    """Builds the toolchain to compile the kernel."""
+
+    installation_directory = settings['installation directory']
+    package_directory = settings['packages directory']
+
+    if not os.path.isdir(installation_directory):
+        utils.sh("mkdir --parents '%s'" % installation_directory,
+                 'Creating the directory for installed toolchain at "%s".' %
+                    installation_directory)
+
+    if not os.path.isdir(package_directory):
+        utils.sh("mkdir --parents '%s'" % package_directory,
+                 'Creating the directory to store toolchain packages at "%s".' %
+                    package_directory)
+
+    initial_working_directories = [os.getcwd()]
+    utils.message('Changing the current working directory to "%s".' %
+                    package_directory)
+    os.chdir(package_directory)
+
+    packages = settings['packages']
+    if len(packages) > 0:
+        utils.sh('type aria2c', 'Checking if the "aria2" package is ' \
+                 'installed "aria2c" is present.')
+        utils.sh('aria2c --enable-rpc', 'Starting aria2 - a lightweight ' \
+                 'multi-protocol & multi-source download utility.', async=True)
+
+        aria2 = xmlrpclib.ServerProxy('http://localhost:6800/rpc').aria2
+        for i in range(3):
+            try:
+                aria2.getGlobalStat(); break
+            except:
+                time.sleep(1)
+
+        for package in packages:
+            package_source = package['source']
+            package_name = package.get('name', package_source)
+
+            utils.message('Trying to get %s.' % package_name)
+            download_gid = aria2.addUri([package_source])
+
+            while True:
+                status = aria2.tellStatus(download_gid, ['status'])['status']
+                if status == 'complete':
+                    break
+                elif status == 'active':
+                    time.sleep(1)
+                elif status == 'error':
+                    raise DownloadError
+
+            package_file = aria2.getFiles(download_gid)[0]['path']
+
+            utils.sh("tar --extract --auto-compress --file '%s'" % package_file,
+                     'Unpacking "%s" to the current working directory.' %
+                        package_file)
+
+        aria2.shutdown()
 
