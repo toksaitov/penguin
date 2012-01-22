@@ -264,12 +264,12 @@ def build_toolchain(settings):
     package_directory = settings['packages directory']
 
     if not os.path.isdir(installation_directory):
-        utils.sh("mkdir --parents '%s'" % installation_directory,
+        utils.sh("mkdir --parents --verbose '%s'" % installation_directory,
                  'Creating the directory for installed toolchain at "%s".' %
                     installation_directory)
 
     if not os.path.isdir(package_directory):
-        utils.sh("mkdir --parents '%s'" % package_directory,
+        utils.sh("mkdir --parents --verbose '%s'" % package_directory,
                  'Creating the directory to store toolchain packages at "%s".' %
                     package_directory)
 
@@ -284,35 +284,64 @@ def build_toolchain(settings):
                  'installed "aria2c" is present.')
         utils.sh('aria2c --enable-rpc', 'Starting aria2 - a lightweight ' \
                  'multi-protocol & multi-source download utility.', async=True)
+        time.sleep(2)
 
         aria2 = xmlrpclib.ServerProxy('http://localhost:6800/rpc').aria2
-        for i in range(3):
-            try:
-                aria2.getGlobalStat(); break
-            except:
-                time.sleep(1)
 
-        for package in packages:
-            package_source = package['source']
-            package_name = package.get('name', package_source)
-
-            utils.message('Trying to get %s.' % package_name)
-            download_gid = aria2.addUri([package_source])
-
-            while True:
-                status = aria2.tellStatus(download_gid, ['status'])['status']
-                if status == 'complete':
-                    break
-                elif status == 'active':
-                    time.sleep(1)
-                elif status == 'error':
-                    raise DownloadError
-
-            package_file = aria2.getFiles(download_gid)[0]['path']
-
-            utils.sh("tar --extract --auto-compress --file '%s'" % package_file,
-                     'Unpacking "%s" to the current working directory.' %
-                        package_file)
+        process_packages(packages, manager=aria2, install=True)
 
         aria2.shutdown()
+
+def process_packages(packages, manager, install=False):
+    """Recursively downloads all 'packages' with a download 'manager' and
+       installs them if requested."""
+
+    for package in packages:
+        package_source = package['source']
+        package_name = package.get('name', package_source)
+
+        utils.message('Trying to get %s.' % package_name)
+        download_gid = manager.addUri([package_source])
+
+        while True:
+            status = manager.tellStatus(download_gid, ['status'])['status']
+            if status == 'complete':
+                break
+            elif status == 'active':
+                time.sleep(1)
+            else:
+                raise DownloadError
+
+        package_file = manager.getFiles(download_gid)[0]['path']
+
+        package_directory = package.get('directory name', None)
+        if package_directory:
+            utils.sh("mkdir --parents --verbose '%s'" % package_directory,
+                     'Creating the directory "%s" to unpack the package.' %
+                        package_directory)
+            utils.sh('tar --extract --auto-compress ' \
+                     "--strip-components 1 --directory '%s' " \
+                     "--file '%s'" % (package_directory, package_file),
+                     'Unpacking "%s" into "%s".' %
+                        (package_file, package_directory))
+        else:
+            utils.sh("tar --extract --auto-compress --file '%s'" % package_file,
+                     'Unpacking "%s" to the current directory.' % package_file)
+
+        required_packages = package.get('required packages', None)
+        if required_packages:
+            old_working_directory = os.getcwd()
+            if not package_directory:
+                parts = package_file.rpartition('.tar')
+                package_directory = parts[0] or parts[-1]
+
+            utils.message('Changing the current working directory to "%s".' %
+                            package_directory)
+            os.chdir(package_directory)
+
+            process_packages(required_packages, manager)
+
+            utils.message('Changing the working directory back to "%s".' %
+                            old_working_directory)
+            os.chdir(old_working_directory)
 
